@@ -12,11 +12,17 @@ uploaded = st.file_uploader("Raw 엑셀 파일 업로드", type=["xlsx"])
 
 if uploaded:
     df = pd.read_excel(uploaded, sheet_name="Raw")
-    df_d = df[df['유통'] == '직거래'].copy()
-    df_d['매출일(배송완료일)'] = pd.to_datetime(df_d['매출일(배송완료일)'])
-    ref_date = pd.Timestamp('2026-03-24')
 
+    # 직거래만 확실하게 필터
+    df_d = df[
+        (df['유통'] == '직거래') &
+        (df['거래처명'].notna())
+    ].copy()
+    df_d['매출일(배송완료일)'] = pd.to_datetime(df_d['매출일(배송완료일)'])
+
+    ref_date = pd.Timestamp('2026-03-24')
     g = df_d.groupby('거래처명')
+
     features = pd.DataFrame({
         '첫구매일'   : g['매출일(배송완료일)'].min(),
         '마지막구매일': g['매출일(배송완료일)'].max(),
@@ -26,6 +32,7 @@ if uploaded:
         '담당자'     : g['담당자'].last(),
         '지역'       : g['지역1'].last(),
     })
+
     features['활동기간_일']  = (features['마지막구매일'] - features['첫구매일']).dt.days.fillna(0)
     features['미구매일수']   = (ref_date - features['마지막구매일']).dt.days.fillna(999)
     features['평균구매주기'] = features['활동기간_일'] / features['총구매횟수'].replace(0,1)
@@ -61,12 +68,12 @@ if uploaded:
 
     # ── 필터
     col_f1, col_f2 = st.columns(2)
-    mgr_list = ['전체'] + sorted(features['담당자'].dropna().unique().tolist())
+    mgr_list   = ['전체'] + sorted(features['담당자'].dropna().unique().tolist())
     grade_list = ['전체', '🔴 긴급', '🟠 위험', '🟡 주의', '🟢 안전']
 
     selected_mgr   = col_f1.selectbox("담당자 선택", mgr_list)
     selected_grade = col_f2.selectbox("위험등급 선택", grade_list)
-    features = features[features.index.isin(df_d['거래처명'].unique())]
+
     result = features.reset_index()[['거래처명', '담당자', '지역',
                                       '미구매일수', '총구매횟수', '구매제품수',
                                       '누적매출액', '이탈확률', '위험등급']].copy()
@@ -77,7 +84,7 @@ if uploaded:
         result = result[result['위험등급'] == selected_grade]
 
     result = result.sort_values('이탈확률', ascending=False)
-    result['이탈확률'] = (result['이탈확률'] * 100).round(1).astype(str) + '%'
+    result['이탈확률']  = (result['이탈확률'] * 100).round(1).astype(str) + '%'
     result['누적매출액'] = result['누적매출액'].apply(lambda x: f"{x:,.0f}원")
 
     st.subheader(f"거래처 목록 ({len(result)}개)")
