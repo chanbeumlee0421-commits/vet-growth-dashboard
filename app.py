@@ -108,24 +108,25 @@ if uploaded:
         if revenue >= 30_000_000 and cnt >= 3 and ratio < 2.0:
             return '🟢 안심'
 
-        # ⚠️ 주의
-        if revenue >= 5_000_000 and cnt >= 5 and ratio >= 1.5:
-            if (trend is not None and trend <= -0.3) or recent6 == 0:
-                return '⚠️ 주의'
-
         # 🚀 성장 ① 반기추세 +20%↑ (이전반기 50만↑ 보장)
         if on_track and trend is not None and trend >= 0.2:
             return '🚀 성장'
 
-        # 🚀 성장 ② 급성장 (이전반기 50만↑ + 최근반기 3배↑ + 활동 180일↑)
+        # 🚀 성장 ② 급성장
         if (on_track and prev6 >= 500_000 and
                 recent6 >= prev6 * 3 and duration >= 180):
             return '🚀 성장'
 
-        # 🚀 성장 ③ 장기재활성화 (활동 365일↑ + 이전반기 0 + 최근반기 500만↑)
+        # 🚀 성장 ③ 장기재활성화
         if (on_track and duration >= 365 and
                 prev6 == 0 and recent6 >= 5_000_000):
             return '🚀 성장'
+
+        # 🟢 안심
+        if revenue >= 10_000_000 and cnt >= 10 and ratio < 2.0:
+            return '🟢 안심'
+        if revenue >= 30_000_000 and cnt >= 3 and ratio < 2.0:
+            return '🟢 안심'
 
         return '😐 보통'
 
