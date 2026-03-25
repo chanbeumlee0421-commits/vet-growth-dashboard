@@ -12,11 +12,11 @@ st.sidebar.markdown("""
 
 | 그룹 | 기준 |
 |---|---|
-| 🟢 안심 | 누적 1000만↑+10회↑+주기배율 2.0↓ / 누적 3000만↑+3회↑+주기배율 2.0↓ |
 | 🚀 성장 | 반기추세 +20%↑(이전반기 50만↑) / 급성장 / 장기재활성화 |
-| ⚠️ 주의 | 누적 500만↑+주기배율 1.5↑+(반기추세 -30%↓ OR 최근반기 0) |
+| 🟢 안심 | 누적 1000만↑+10회↑+주기배율 2.0↓ / 누적 3000만↑+3회↑+주기배율 2.0↓ |
+| ⚠️ 주의 | 누적 500만↑+5회↑+주기배율 1.5↑+(반기추세 -30%↓ OR 최근반기 0) |
 | 😐 보통 | 위 조건 해당 없음 |
-| 💀 정리 | 365일↑미구매+최근반기0+누적500만↓ / 365일↑+누적300만↓+3회↓ |
+| 💀 정리 | 365일↑미구매+최근반기0+누적1000만↓ / 365일↑+누적300만↓+3회↓ |
 
 ---
 ### 지표 설명
@@ -77,6 +77,7 @@ if uploaded:
             lambda x: pd.Series(get_half(x), index=['최근반기', '이전반기']))
         features['최근반기'] = half['최근반기'].values
         features['이전반기'] = half['이전반기'].values
+        # 이전반기 50만 미만이면 None (왜곡 방지)
         features['반기추세'] = features.apply(
             lambda r: (r['최근반기'] - r['이전반기']) / r['이전반기']
             if r['이전반기'] >= 500_000 else None, axis=1)
@@ -94,40 +95,37 @@ if uploaded:
         duration = row['활동기간_일']
         on_track = ratio < 1.5
 
-        # 💀 정리대상
-        # 조건①: 365일↑ 미구매 + 최근반기 0 + 누적 500만↓
-        if inactive >= 365 and recent6 == 0 and revenue < 5_000_000:
+        # 1순위: 💀 정리대상
+        if inactive >= 365 and recent6 == 0 and revenue < 10_000_000:
             return '💀 정리대상'
-        # 조건②: 365일↑ 미구매 + 누적 300만↓ + 3회↓
         if inactive >= 365 and revenue < 3_000_000 and cnt <= 3:
             return '💀 정리대상'
 
-        # 🟢 안심
-        if revenue >= 10_000_000 and cnt >= 10 and ratio < 2.0:
-            return '🟢 안심'
-        if revenue >= 30_000_000 and cnt >= 3 and ratio < 2.0:
-            return '🟢 안심'
+        # 2순위: ⚠️ 주의 (성장보다 먼저 — 과거 좋았지만 최근 나빠진 곳)
+        if revenue >= 5_000_000 and cnt >= 5 and ratio >= 1.5:
+            if (pd.notna(trend) and trend <= -0.3) or recent6 == 0:
+                return '⚠️ 주의'
 
-        # 🚀 성장 ① 반기추세 +20%↑ (이전반기 50만↑ 보장)
-        if on_track and trend is not None and trend >= 0.2:
+        # 3순위: 🚀 성장
+        # ① 반기추세 +20%↑ (이전반기 50만↑ 보장됨)
+        if on_track and pd.notna(trend) and trend >= 0.2:
             return '🚀 성장'
-
-        # 🚀 성장 ② 급성장
+        # ② 급성장 (이전반기 있고 최근반기 3배↑)
         if (on_track and prev6 >= 500_000 and
                 recent6 >= prev6 * 3 and duration >= 180):
             return '🚀 성장'
-
-        # 🚀 성장 ③ 장기재활성화
+        # ③ 장기재활성화 (활동 365일↑ + 이전반기 0 + 최근반기 500만↑)
         if (on_track and duration >= 365 and
                 prev6 == 0 and recent6 >= 5_000_000):
             return '🚀 성장'
 
-        # 🟢 안심
+        # 4순위: 🟢 안심
         if revenue >= 10_000_000 and cnt >= 10 and ratio < 2.0:
             return '🟢 안심'
         if revenue >= 30_000_000 and cnt >= 3 and ratio < 2.0:
             return '🟢 안심'
 
+        # 5순위: 😐 보통
         return '😐 보통'
 
     features['그룹'] = features.apply(assign_group, axis=1)
@@ -135,7 +133,7 @@ if uploaded:
     # ── 전체 현황 ──────────────────────────────────────
     st.subheader("📊 전체 현황")
     total  = len(features)
-    groups = ['🟢 안심', '🚀 성장', '⚠️ 주의', '😐 보통', '💀 정리대상']
+    groups = ['🚀 성장', '🟢 안심', '⚠️ 주의', '😐 보통', '💀 정리대상']
     counts = {g: (features['그룹'] == g).sum() for g in groups}
 
     cols = st.columns(5)
@@ -143,8 +141,8 @@ if uploaded:
         col.metric(label, f"{cnt}개", f"{cnt/total:.0%}")
 
     color_map = {
-        '🟢 안심':    '#2ecc71',
         '🚀 성장':    '#3498db',
+        '🟢 안심':    '#2ecc71',
         '⚠️ 주의':   '#e67e22',
         '😐 보통':    '#95a5a6',
         '💀 정리대상':'#e74c3c',
