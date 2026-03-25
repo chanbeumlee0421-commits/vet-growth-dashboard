@@ -14,15 +14,15 @@ st.sidebar.markdown("""
 |---|---|
 | 🟢 안심 | 누적 1000만↑+10회↑+주기배율 2.0↓ / 누적 3000만↑+3회↑+주기배율 2.0↓ |
 | 🚀 성장 | 반기추세 +20%↑(이전반기 50만↑) / 급성장 / 장기재활성화 |
-| ⚠️ 주의 | 누적 500만↑+5회↑+주기배율 1.5↑+반기추세 -30%↓ |
+| ⚠️ 주의 | 누적 500만↑+주기배율 1.5↑+(반기추세 -30%↓ OR 최근반기 0) |
 | 😐 보통 | 위 조건 해당 없음 |
-| 💀 정리 | 미구매 365일↑+누적 300만↓+3회↓ |
+| 💀 정리 | 365일↑미구매+최근반기0+누적500만↓ / 365일↑+누적300만↓+3회↓ |
 
 ---
 ### 지표 설명
 **주기배율** = 미구매일수 ÷ 평균구매주기
 **반기추세** = 최근6개월 vs 이전6개월 매출 변화율
-(이전반기 50만원 미만이면 계산 제외 → -)
+(이전반기 50만원 미만이면 -)
 """)
 
 uploaded = st.file_uploader("Raw 엑셀 파일 업로드", type=["xlsx"])
@@ -77,12 +77,9 @@ if uploaded:
             lambda x: pd.Series(get_half(x), index=['최근반기', '이전반기']))
         features['최근반기'] = half['최근반기'].values
         features['이전반기'] = half['이전반기'].values
-
-        # 이전반기 50만원 미만이면 None (왜곡 방지)
         features['반기추세'] = features.apply(
             lambda r: (r['최근반기'] - r['이전반기']) / r['이전반기']
             if r['이전반기'] >= 500_000 else None, axis=1)
-
         features['주요제품'] = features['거래처명'].apply(top3_products)
 
     # ── 그룹 분류 ──────────────────────────────────────
@@ -97,7 +94,11 @@ if uploaded:
         duration = row['활동기간_일']
         on_track = ratio < 1.5
 
-        # 💀 정리
+        # 💀 정리대상
+        # 조건①: 365일↑ 미구매 + 최근반기 0 + 누적 500만↓
+        if inactive >= 365 and recent6 == 0 and revenue < 5_000_000:
+            return '💀 정리대상'
+        # 조건②: 365일↑ 미구매 + 누적 300만↓ + 3회↓
         if inactive >= 365 and revenue < 3_000_000 and cnt <= 3:
             return '💀 정리대상'
 
@@ -108,12 +109,11 @@ if uploaded:
             return '🟢 안심'
 
         # ⚠️ 주의
-        if (revenue >= 5_000_000 and cnt >= 5 and
-                ratio >= 1.5 and
-                trend is not None and trend <= -0.3):
-            return '⚠️ 주의'
+        if revenue >= 5_000_000 and cnt >= 5 and ratio >= 1.5:
+            if (trend is not None and trend <= -0.3) or recent6 == 0:
+                return '⚠️ 주의'
 
-        # 🚀 성장 ① 반기추세 +20%↑ (이전반기 50만↑ 보장됨)
+        # 🚀 성장 ① 반기추세 +20%↑ (이전반기 50만↑ 보장)
         if on_track and trend is not None and trend >= 0.2:
             return '🚀 성장'
 
@@ -127,7 +127,6 @@ if uploaded:
                 prev6 == 0 and recent6 >= 5_000_000):
             return '🚀 성장'
 
-        # 😐 보통
         return '😐 보통'
 
     features['그룹'] = features.apply(assign_group, axis=1)
@@ -149,7 +148,10 @@ if uploaded:
         '😐 보통':    '#95a5a6',
         '💀 정리대상':'#e74c3c',
     }
-    pie = pd.DataFrame({'그룹': list(counts.keys()), '수': list(counts.values())})
+    pie = pd.DataFrame({
+        '그룹': list(counts.keys()),
+        '수':   list(counts.values())
+    })
     fig = px.pie(pie, values='수', names='그룹',
                  color='그룹', color_discrete_map=color_map)
     fig.update_layout(height=300, margin=dict(t=0, b=0))
@@ -181,9 +183,9 @@ if uploaded:
     display['구매제품수']  = result['구매제품수'].values
     display['누적매출액']  = result['누적매출액'].apply(lambda x: f"{x:,.0f}원").values
     display['회당매출']    = result['회당매출'].apply(lambda x: f"{x:,.0f}원").values
-    display['반기추세'] = result['반기추세'].apply(
-            lambda x: f"+{x:.0%}" if pd.notna(x) and x > 0
-            else (f"{x:.0%}" if pd.notna(x) else "-")).values
+    display['반기추세']    = result['반기추세'].apply(
+        lambda x: f"+{x:.0%}" if pd.notna(x) and x > 0
+        else (f"{x:.0%}" if pd.notna(x) else "-")).values
     display['미구매일수']  = result['미구매일수'].values
     display['평균구매주기']= result['평균구매주기'].apply(lambda x: f"{x:.0f}일").values
     display['주기배율']    = result['주기배율'].apply(lambda x: f"{x:.1f}배").values
