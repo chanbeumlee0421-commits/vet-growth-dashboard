@@ -181,9 +181,9 @@ if uploaded:
     display['구매제품수']  = result['구매제품수'].values
     display['누적매출액']  = result['누적매출액'].apply(lambda x: f"{x:,.0f}원").values
     display['회당매출']    = result['회당매출'].apply(lambda x: f"{x:,.0f}원").values
-    display['반기추세']    = result['반기추세'].apply(
-        lambda x: f"+{x:.0%}" if x is not None and x > 0
-        else (f"{x:.0%}" if x is not None else "-")).values
+    display['반기추세'] = result['반기추세'].apply(
+            lambda x: f"+{x:.0%}" if pd.notna(x) and x > 0
+            else (f"{x:.0%}" if pd.notna(x) else "-")).values
     display['미구매일수']  = result['미구매일수'].values
     display['평균구매주기']= result['평균구매주기'].apply(lambda x: f"{x:.0f}일").values
     display['주기배율']    = result['주기배율'].apply(lambda x: f"{x:.1f}배").values
