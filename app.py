@@ -95,11 +95,11 @@ if uploaded:
         duration = row['활동기간_일']
         on_track = ratio < 1.5
 
-        # 1순위: 💀 정리대상
-        if inactive >= 365 and recent6 == 0 and revenue < 10_000_000:
-            return '💀 정리대상'
-        if inactive >= 365 and revenue < 3_000_000 and cnt <= 3:
-            return '💀 정리대상'
+        # 1순위: 💤 비활성화
+        if inactive >= 365 and revenue < 10_000_000:
+                    return '💤 비활성화'
+                if inactive >= 365 and cnt <= 3:
+                    return '💤 비활성화'
 
         # 2순위: ⚠️ 주의 (성장보다 먼저 — 과거 좋았지만 최근 나빠진 곳)
         if revenue >= 5_000_000 and cnt >= 5 and ratio >= 1.5:
