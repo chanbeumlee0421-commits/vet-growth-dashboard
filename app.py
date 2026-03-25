@@ -124,12 +124,7 @@ if uploaded:
     st.divider()
 
     # ── 탭 구성 ────────────────────────────────────────
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📞 이번 주 연락 리스트",
-        "♻️ 재활성화 대상",
-        "⭐ 핵심 거래처 현황",
-        "📋 전체 거래처"
-    ])
+    tab1, = st.tabs(["📋 전체 거래처"])
 
     def format_df(df_in):
         out = df_in.copy()
