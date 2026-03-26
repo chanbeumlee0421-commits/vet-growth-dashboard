@@ -62,22 +62,22 @@ if uploaded:
     features['회당매출']     = features['누적매출액'] / features['총구매횟수'].replace(0, 1)
 
     # ── 반기 매출 ──────────────────────────────────────
-    def get_half(hosp):
-        d      = df_d[df_d['거래처명'] == hosp]
+    def half_rev(vet):
+        d      = df_d[df_d['거래처명'] == vet]
         recent = d[d['매출일(배송완료일)'] >  cut6]['매출액(vat 제외)'].sum()
         prev   = d[(d['매출일(배송완료일)'] >  cut12) &
                    (d['매출일(배송완료일)'] <= cut6)]['매출액(vat 제외)'].sum()
         return recent, prev
 
     # ── 주요제품 ──────────────────────────────────────
-    def top3_products(hosp):
-        d   = df_d[df_d['거래처명'] == hosp]
+    def top3_products(vet):
+        d   = df_d[df_d['거래처명'] == vet]
         top = d.groupby('품명요약2')['매출수량'].sum().sort_values(ascending=False).head(3)
         return ' / '.join([f"{p} {int(q)}개" for p, q in top.items()])
 
     with st.spinner("거래처 분석 중..."):
         half = features['거래처명'].apply(
-            lambda x: pd.Series(get_half(x), index=['최근반기', '이전반기']))
+            lambda x: pd.Series(half_rev(x), index=['최근반기', '이전반기']))
         features['최근반기'] = half['최근반기'].values
         features['이전반기'] = half['이전반기'].values
         features['반기추세'] = features.apply(
@@ -109,14 +109,11 @@ if uploaded:
                 return '⚠️ 주의'
 
         # 3순위: 🚀 성장
-        # ① 반기추세 +20%↑
         if on_track and pd.notna(trend) and trend >= 0.2:
             return '🚀 성장'
-        # ② 급성장
         if (on_track and prev6 >= 500_000 and
                 recent6 >= prev6 * 3 and duration >= 180):
             return '🚀 성장'
-        # ③ 장기재활성화
         if (on_track and duration >= 365 and
                 prev6 == 0 and recent6 >= 5_000_000):
             return '🚀 성장'
