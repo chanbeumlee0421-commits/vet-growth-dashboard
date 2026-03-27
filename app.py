@@ -10,21 +10,41 @@ st.caption("경보제약 주문처")
 st.sidebar.markdown("""
 ### 그룹 분류 기준
 
-| 그룹 | 기준 |
-|---|---|
-| 🚀 성장 | 반기추세 +20%↑(이전반기 50만↑) / 급성장 / 장기재활성화 |
-| 🟢 안심 | 누적 1000만↑+10회↑+주기배율 2.0↓ / 누적 3000만↑+3회↑+주기배율 2.0↓ |
-| ⚠️ 주의 | 누적 500만↑+5회↑+주기배율 1.5↑+(반기추세 -30%↓ OR 최근반기 0) |
-| 😐 보통 | 위 조건 해당 없음 |
-| 💤 비활성화 | 365일↑미구매+누적1000만↓ / 365일↑+3회↓ |
+**🚀 성장**
+- 최근 6개월 매출이 이전 6개월 대비 20% 이상 증가
+- 단, 이전 6개월 매출이 50만원 이상인 경우만 계산
+
+**🟢 안심**
+- 누적매출 1000만원↑ + 구매 10회↑ + 주문지체율 2.0 이하
+- 또는 누적매출 3000만원↑ + 구매 3회↑ + 주문지체율 2.0 이하
+
+**⚠️ 주의**
+- 누적매출 500만원↑ + 구매 5회↑
+- + 주문지체율 1.5 초과
+- + 최근 6개월 매출 감소(-30% 이하) 또는 최근 6개월 매출 0
+
+**😐 보통**
+- 위 조건에 해당하지 않는 거래처
+
+**💤 비활성화**
+- 365일 이상 미구매 + 누적매출 1000만원 미만
+- 또는 365일 이상 미구매 + 구매 3회 이하
 
 ---
 ### 지표 설명
-**주기배율** = 미구매일수 ÷ 평균구매주기
-**반기추세** = 최근6개월 vs 이전6개월 매출 변화율
-(이전반기 50만원 미만이면 -)
 
-**기준일** = 오늘 날짜 자동 적용
+**주문지체율**
+평균 구매 주기 대비 현재 미구매일수 비율
+- 1.0 = 평균 주기에 맞게 오고 있음
+- 1.5 = 평균보다 1.5배 늦어짐
+- 2.0 = 평균의 2배 지남 (많이 늦어진 상태)
+
+**반기추세**
+최근 6개월 매출을 이전 6개월과 비교한 변화율
+이전 6개월 매출이 50만원 미만이면 - 로 표시
+
+**기준일**
+파일 업로드하는 당일 자동 적용
 """)
 
 uploaded = st.file_uploader("Raw 엑셀 파일 업로드", type=["xlsx"])
@@ -55,11 +75,11 @@ if uploaded:
         '지역'       : g['지역1'].last(),
     }).reset_index()
 
-    features['활동기간_일']  = (features['마지막구매일'] - features['첫구매일']).dt.days.fillna(0)
-    features['미구매일수']   = (ref_date - features['마지막구매일']).dt.days.fillna(999)
-    features['평균구매주기'] = features['활동기간_일'] / features['총구매횟수'].replace(0, 1)
-    features['주기배율']     = features['미구매일수'] / features['평균구매주기'].replace(0, 1)
-    features['회당매출']     = features['누적매출액'] / features['총구매횟수'].replace(0, 1)
+    features['활동기간_일']   = (features['마지막구매일'] - features['첫구매일']).dt.days.fillna(0)
+    features['미구매일수']    = (ref_date - features['마지막구매일']).dt.days.fillna(999)
+    features['평균구매주기']  = features['활동기간_일'] / features['총구매횟수'].replace(0, 1)
+    features['주문지체율']    = features['미구매일수'] / features['평균구매주기'].replace(0, 1)
+    features['회당매출']      = features['누적매출액'] / features['총구매횟수'].replace(0, 1)
 
     # ── 반기 매출 ──────────────────────────────────────
     def half_rev(vet):
@@ -88,7 +108,7 @@ if uploaded:
     # ── 그룹 분류 ──────────────────────────────────────
     def assign_group(row):
         cnt      = row['총구매횟수']
-        ratio    = row['주기배율']
+        ratio    = row['주문지체율']
         revenue  = row['누적매출액']
         trend    = row['반기추세']
         recent6  = row['최근반기']
@@ -188,7 +208,7 @@ if uploaded:
         else (f"{x:.0%}" if pd.notna(x) else "-")).values
     display['미구매일수']  = result['미구매일수'].values
     display['평균구매주기']= result['평균구매주기'].apply(lambda x: f"{x:.0f}일").values
-    display['주기배율']    = result['주기배율'].apply(lambda x: f"{x:.1f}배").values
+    display['주문지체율']  = result['주문지체율'].apply(lambda x: f"{x:.1f}배").values
     display['주요제품']    = result['주요제품'].values
 
     st.subheader(f"📋 거래처 목록 ({len(result)}개)")
